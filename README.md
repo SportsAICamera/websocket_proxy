@@ -1,2 +1,4 @@
 # websocket_proxy
-Redirect websocket between local clients.
+Redirect websocket stream between local clients.
+
+Lanuage : Python
