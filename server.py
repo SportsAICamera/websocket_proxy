@@ -210,7 +210,12 @@ class WebsocketProxy:
                     await asyncio.sleep(0.1)
                     continue
 
-                jsondata, prev_frame = ret
+                jsondata, new_frame = ret
+                if new_frame <= prev_frame:
+                    await asyncio.sleep(0.05)
+                    continue
+                prev_frame = new_frame
+
                 data = json.loads(jsondata)
                 # print(len(data))
                 if len(data) == 0:
