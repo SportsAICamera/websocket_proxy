@@ -78,10 +78,10 @@ class StreamSource:
             return None
         else:
         #   print("3")
-            pos = (cur_frame - self.frame_no[self.st]) + self.st
-            if pos >= self.sz:
-                pos -= self.sz
-
+            while pos != self.ed and self.frame_no[pos]< prev_frame:
+                pos = self.buf_next(pos)
+            if pos == self.ed:
+                return None
         ret = self.buf[pos]
         # print("read success")
         #    self.st = self.buf_next(self.st)
@@ -156,7 +156,11 @@ class WebsocketProxy:
                     await asyncio.sleep(0.1)
                     continue
                 data = json.loads(ret)
-                prev_frame = data["frame_no"]
+                new_frame = data["frame_no"]
+                if new_frame <= prev_frame:
+                    await asyncio.sleep(0.05)
+                    continue
+                prev_frame = new_frame
                 streamsource.push_buf(ret, prev_frame)
                 print("<-", prev_frame)
                 await asyncio.sleep(0.05)
@@ -228,16 +232,15 @@ class WebsocketProxy:
             print("outHandler err3", e)
         finally:
             print("Disconnected video {}/{}".format(videoId, streamId))
-            WebsocketProxy.streamManager.removeWebsocket(uid, websocket)
+            WebsocketProxy.streamManager.removeWebsocket(videoId, websocket)
 
 if __name__ == '__main__':
     innstream_port = int(config['STREAM']['innstream_port'])
     outstream_port = int(config['STREAM']['outstream_port'])
 
-    # loop = asyncio.new_event_loop()
-
     start_inn_server = websockets.serve(WebsocketProxy.innHandler, port=innstream_port)
     start_out_server = websockets.serve(WebsocketProxy.outHandler, port=outstream_port)
-    asyncio.get_event_loop().run_until_complete(start_inn_server)
-    asyncio.get_event_loop().run_until_complete(start_out_server)
-    asyncio.get_event_loop().run_forever()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_inn_server)
+    loop.run_until_complete(start_out_server)
+    loop.run_forever()
