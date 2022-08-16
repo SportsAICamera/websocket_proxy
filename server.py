@@ -136,7 +136,7 @@ class WebsocketProxy:
             return
 
         svideoId = vals[1]
-        if svideoId is "":
+        if svideoId == "":
             svideoId = "1"
 
         try:
@@ -178,9 +178,9 @@ class WebsocketProxy:
 
         svideoId = vals[1]
         sstreamId = vals[2]
-        if svideoId is "":
+        if svideoId == "":
             svideoId = "1"
-        if sstreamId is "":
+        if sstreamId == "":
             sstreamId = "0"
 
         try:
