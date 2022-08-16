@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 import websockets
 from threading import Thread
 from time import sleep
@@ -6,6 +7,7 @@ import argparse, configparser
 import sys 
 import json
 import base64
+from enumCMD import EnumCMD
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -113,7 +115,8 @@ class StreamManager:
         return self.getStreamsource(uid)
 
     def removeWebsocket(self, uid, websocket):
-        self.websock_rooms[uid].remove(websocket)
+        if uid in self.websock_rooms:
+            self.websock_rooms[uid].remove(websocket)
 
     def getStreamsource(self, uid):
         if uid not in self.stream_pool:
@@ -128,141 +131,91 @@ class WebsocketProxy:
     def __init__(self):
         self.TAG = "[WebsocketProxy]"
 
-    async def innHandler(websocket, path):
-        TAG = "[innHandler]"
-        print(TAG, " New Websocket ", path)
+    async def inoutHandler(websocket, path):
+        print("[inoutHandler] New Websocket!", path)
         vals = path.split('/')
-        if len(vals) < 2:
-            return
-
-        svideoId = vals[1]
-        if svideoId == "":
-            svideoId = "1"
-
         try:
-            videoId = int(svideoId)
+            fr_path = int(vals[1])
+            to_path = int(vals[2])
         except:
-            print(TAG, "convert error!")
+            print("[inoutHandler] URL Error!", path)
             return
+
+        TAG = "[{} => {}] : ".format(fr_path, to_path)
+        SEND_TAG = "[{} -> {}] : ".format(fr_path, to_path)
+        RECV_TAG = "[{} <- {}] : ".format(fr_path, to_path)
 
         # Save Websocket Connection
-        streamsource = WebsocketProxy.streamManager.getStreamsource(videoId)
-        prev_frame = -1
+        fr_streamsource = WebsocketProxy.streamManager.getStreamsource(fr_path)
+        to_streamsource = WebsocketProxy.streamManager.getStreamsource(to_path)
+
+        send_prev_frame = -1
+        recv_prev_frame = -1
 
         try:
             while True:
-                ret = await websocket.recv()
-                if ret is None:
-                    await asyncio.sleep(0.1)
-                    continue
-                data = json.loads(ret)
-                new_frame = data["frame_no"]
-                if new_frame <= prev_frame:
+                send_obj = await websocket.recv()
+                if send_obj is not None:
+                    data = json.loads(send_obj)
+                    send_new_frame = data["no"]
+                    str_cmd = EnumCMD.getEnumName(data["cmd"])
+                    if send_new_frame <= send_prev_frame:
+                        await asyncio.sleep(0.05)
+                        continue
+                    send_prev_frame = send_new_frame
+                    to_streamsource.push_buf(send_obj, send_prev_frame)
+                    print(SEND_TAG, str_cmd, send_prev_frame)
                     await asyncio.sleep(0.05)
-                    continue
-                prev_frame = new_frame
-                streamsource.push_buf(ret, prev_frame)
-                print("<-", prev_frame)
-                await asyncio.sleep(0.05)
-        except Exception as e:
-            print("innHandler err2", e)
-        finally:
-            print("Disconnected innStream {}".format(videoId))
+                else:
+                    await asyncio.sleep(0.1)
 
-    async def outHandler(websocket, path):
-        TAG = "[outHandler]"
-        print(TAG, " New Websocket ", path)
-        vals = path.split('/')
-        if len(vals) < 3:
-            return
 
-        svideoId = vals[1]
-        sstreamId = vals[2]
-        if svideoId == "":
-            svideoId = "1"
-        if sstreamId == "":
-            sstreamId = "0"
 
-        try:
-            videoId = int(svideoId)
-        except:
-            print(TAG, "convert error!")
-            return
-
-        try:
-            streamId = int(sstreamId)
-            if streamId > 3:
-                streamId = 3
-            if streamId < 1:
-                streamId = 1
-        except:
-            print("convert error!")
-            return
-
-        # Save Websocket Connection
-        streamsource = WebsocketProxy.streamManager.addWebsocket(videoId, websocket)
-        prev_frame = -1
-
-        try:
-            while True:
-                ret = streamsource.read_buf(prev_frame)
-                if ret is None:
+                recv_obj = fr_streamsource.read_buf(recv_prev_frame)
+                if recv_obj is None:
                     await asyncio.sleep(0.1)
                     continue
 
-                jsondata, new_frame = ret
-                if new_frame <= prev_frame:
-                    await asyncio.sleep(0.05)
+                jsondata, recv_new_frame = recv_obj
+                if recv_new_frame <= recv_prev_frame:
+                    await asyncio.sleep(0.1)
                     continue
-                prev_frame = new_frame
 
+                recv_prev_frame = recv_new_frame
                 data = json.loads(jsondata)
                 # print(len(data))
+                str_cmd = EnumCMD.getEnumName(data["cmd"])
                 if len(data) == 0:
                     await asyncio.sleep(0.1)
                     continue
-                
-                try:
-                    send_obj = {}
-                    send_obj["scene"] = data["scene"]
-                    send_obj["frame"] = data["frame_no"]
-                except Exception as e:
-                    print("outHandler err2", e)
-                await websocket.send(json.dumps(send_obj))
-                print("->", prev_frame)
-                # time_save_1 = time.time()
-                #        print('FPS:', (time_save_1 - time_save_0))
+
+                # try:
+                #     recv_obj = {}
+                #     recv_obj["scene"] = data["scene"]
+                #     recv_obj["no"] = data["no"]
+                # except Exception as e:
+                #     print(RECV_TAG, "Err2", e)
+                await websocket.send(json.dumps(data))
+                print(RECV_TAG, str_cmd, recv_prev_frame)
                 await asyncio.sleep(0.05)
         except Exception as e:
-            print("outHandler err3", e)
+            print(TAG, "Err2", e)
         finally:
-            print("Disconnected video {}/{}".format(videoId, streamId))
-            WebsocketProxy.streamManager.removeWebsocket(videoId, websocket)
+            print(TAG, "Disconnected!")
+            WebsocketProxy.streamManager.removeWebsocket(fr_path, websocket)
 
 if __name__ == "__main__":
-
     import platform
     if platform.system() == 'Windows':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-    innstream_port = int(config['STREAM']['innstream_port'])
-    outstream_port = int(config['STREAM']['outstream_port'])
-
-    start_inn_server = websockets.serve(WebsocketProxy.innHandler, port=innstream_port, max_size= 10 * 1024 * 1024, max_queue=20)
-    start_out_server = websockets.serve(WebsocketProxy.outHandler, port=outstream_port, max_size= 10 * 1024 * 1024, max_queue=20)
+    stream_port = int(config['STREAM']['stream_port'])
+    start_inn_out_server = websockets.serve(WebsocketProxy.inoutHandler, port=stream_port, max_size= 10 * 1024 * 1024, max_queue=20)
 
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError as ex:
         print(ex)
         loop = asyncio.new_event_loop()
-    # loop = asyncio.get_event_loop()
-    # loop = asyncio.new_event_loop()
-    # asyncio.set_event_loop(loop)
-    loop.run_until_complete(start_inn_server)
-    loop.run_until_complete(start_out_server)
+    loop.run_until_complete(start_inn_out_server)
     loop.run_forever()
-
-    # periodic_inn_task = asyncio.create_task(start_inn_server)
-    # periodic_out_task = asyncio.create_task(start_out_server)
-    # await asyncio.gather(periodic_inn_task, periodic_out_task)

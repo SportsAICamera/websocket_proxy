@@ -11,7 +11,7 @@ from enumCMD import EnumCMD
 
 async def hello():
     # 3.20.174.14
-    async with websockets.connect("ws://127.0.0.1:8765/0/1") as websocket:
+    async with websockets.connect("ws://127.0.0.1:8765/1/0") as websocket:
         # Receive Initial Data Packet
         # ret = await websocket.recv()
         # recv = json.loads(ret)
@@ -41,7 +41,7 @@ async def hello():
             frame_no += 1
             data = {}
             data["no"] = frame_no
-            data["cmd"] = EnumCMD.SEND_IMAGE.value
+            data["cmd"] = EnumCMD.CMD_MOUSE_CLICK.value
             retval, buffer = cv2.imencode('.jpg', img)
             data["scene"] = base64.b64encode(buffer).decode('utf-8')
 
