@@ -11,13 +11,12 @@
       <script type = "text/javascript">
          var ws;
          function WebSocketTest() {
-            
+            var image_tag = document.getElementById("image");           
             if ("WebSocket" in window) {
                console.log("WebSocket is supported by your Browser!");
-               var domainPath = "54.151.253.50";               
-               var videoid = 5;
+               var domainPath = "127.0.0.1:8766";               
                // Let us open a web socket
-               ws = new WebSocket("ws://" + domainPath + "/ws/" + videoid);
+               ws = new WebSocket("ws://" + domainPath + "/1/1");
                ws.onopen = function() {
                   
                   // Web Socket is connected, send data using send()
@@ -27,8 +26,10 @@
 				
                ws.onmessage = function (evt) { 
                   var received_msg = evt.data;
+                  var obj =  JSON.parse(received_msg);
                   // alert("Message is received...");
-                  console.log(received_msg)
+                  image_tag.src = 'data:image/jpeg;base64,' + obj.scene;
+
                };
 				
                ws.onclose = function() { 
@@ -55,6 +56,9 @@
          <h3>Press <div class="red">F12</div> to open console window and check received data there!</h3>
          <a href = "javascript:WebSocketTest()">Run WebSocket</a>
          <a href="javascript:WebSocketClose()" style="padding-left:30px;">Stop WebSocket</a>
+         <div>
+            <img id="image"/>
+         </div>
       </div>
       
    </body>

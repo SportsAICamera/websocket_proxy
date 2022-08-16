@@ -24,7 +24,7 @@ class DataQueue:
 class StreamSource:
     def __init__(self, uid):
         self.st = self.ed = 0
-        self.sz = 10
+        self.sz = 3
         self.buf = [[] for x in range(self.sz)]
         self.frame_no = [[] for x in range(self.sz)]
         self.no = 0
@@ -225,7 +225,7 @@ class WebsocketProxy:
                 try:
                     send_obj = {}
                     send_obj["scene"] = data["scene"]
-                    send_obj["frame"] = data["frame" + str(streamId)]
+                    send_obj["frame"] = data["frame_no"]
                 except Exception as e:
                     print("outHandler err2", e)
                 await websocket.send(json.dumps(send_obj))
@@ -239,13 +239,30 @@ class WebsocketProxy:
             print("Disconnected video {}/{}".format(videoId, streamId))
             WebsocketProxy.streamManager.removeWebsocket(videoId, websocket)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+
+    import platform
+    if platform.system() == 'Windows':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
     innstream_port = int(config['STREAM']['innstream_port'])
     outstream_port = int(config['STREAM']['outstream_port'])
 
-    start_inn_server = websockets.serve(WebsocketProxy.innHandler, port=innstream_port)
-    start_out_server = websockets.serve(WebsocketProxy.outHandler, port=outstream_port)
-    loop = asyncio.get_event_loop()
+    start_inn_server = websockets.serve(WebsocketProxy.innHandler, 'localhost', port=innstream_port)
+    start_out_server = websockets.serve(WebsocketProxy.outHandler, 'localhost', port=outstream_port)
+
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError as ex:
+        print(ex)
+        loop = asyncio.new_event_loop()
+    # loop = asyncio.get_event_loop()
+    # loop = asyncio.new_event_loop()
+    # asyncio.set_event_loop(loop)
     loop.run_until_complete(start_inn_server)
     loop.run_until_complete(start_out_server)
     loop.run_forever()
+
+    # periodic_inn_task = asyncio.create_task(start_inn_server)
+    # periodic_out_task = asyncio.create_task(start_out_server)
+    # await asyncio.gather(periodic_inn_task, periodic_out_task)
