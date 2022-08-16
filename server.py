@@ -248,8 +248,8 @@ if __name__ == "__main__":
     innstream_port = int(config['STREAM']['innstream_port'])
     outstream_port = int(config['STREAM']['outstream_port'])
 
-    start_inn_server = websockets.serve(WebsocketProxy.innHandler, 'localhost', port=innstream_port)
-    start_out_server = websockets.serve(WebsocketProxy.outHandler, 'localhost', port=outstream_port)
+    start_inn_server = websockets.serve(WebsocketProxy.innHandler, port=innstream_port)
+    start_out_server = websockets.serve(WebsocketProxy.outHandler, port=outstream_port)
 
     try:
         loop = asyncio.get_event_loop()
