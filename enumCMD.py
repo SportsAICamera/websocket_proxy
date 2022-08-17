@@ -1,7 +1,8 @@
 from enum import Enum
 
 class EnumCMD(Enum):
-    NOTHING = -1
+    NULL = -1
+    NOTHING = 0
 
     SEND_IMAGE = 1000
 

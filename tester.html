@@ -61,8 +61,8 @@
                   cmd: EnumCMD.CMD_MOUSE_CLICK,
                   data: pos
                 };
-                send_ws_packet(packet);
-                console.log("[mouse click] x: " + pos[0] + " y: " + pos[1])
+               //  send_ws_packet(packet);
+               //  console.log("[mouse click] x: " + pos[0] + " y: " + pos[1])
                })
             canvas.addEventListener('dblclick', function(e) {
                 var pos = getCursorPosition(canvas, e)
