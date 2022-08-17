@@ -1,5 +1,6 @@
 import asyncio
 from enum import Enum
+from multiprocessing.reduction import send_handle
 import websockets
 from threading import Thread
 from time import sleep
@@ -131,47 +132,42 @@ class WebsocketProxy:
     def __init__(self):
         self.TAG = "[WebsocketProxy]"
 
-    async def inoutHandler(websocket, path):
-        print("[inoutHandler] New Websocket!", path)
-        vals = path.split('/')
-        try:
-            fr_path = int(vals[1])
-            to_path = int(vals[2])
-        except:
-            print("[inoutHandler] URL Error!", path)
-            return
-
-        TAG = "[{} => {}] : ".format(fr_path, to_path)
-        SEND_TAG = "[{} -> {}] : ".format(fr_path, to_path)
-        RECV_TAG = "[{} <- {}] : ".format(fr_path, to_path)
-
-        # Save Websocket Connection
-        fr_streamsource = WebsocketProxy.streamManager.getStreamsource(fr_path)
-        to_streamsource = WebsocketProxy.streamManager.getStreamsource(to_path)
-
+    async def sendHandler(websocket, fr_path, to_path):
         send_prev_frame = -1
-        recv_prev_frame = -1
+        TAG = "[{} -> {}] : ".format(fr_path, to_path)
+        streamsource = WebsocketProxy.streamManager.getStreamsource(fr_path)
 
         try:
             while True:
                 send_obj = await websocket.recv()
-                if send_obj is not None:
-                    data = json.loads(send_obj)
-                    send_new_frame = data["no"]
-                    str_cmd = EnumCMD.getEnumName(data["cmd"])
-                    if send_new_frame <= send_prev_frame:
-                        await asyncio.sleep(0.05)
-                        continue
-                    send_prev_frame = send_new_frame
-                    to_streamsource.push_buf(send_obj, send_prev_frame)
-                    print(SEND_TAG, str_cmd, send_prev_frame)
-                    await asyncio.sleep(0.05)
-                else:
+                if send_obj is None:
                     await asyncio.sleep(0.1)
+                    continue
 
+                data = json.loads(send_obj)
+                send_new_frame = data["no"]
+                str_cmd = EnumCMD.getEnumName(data["cmd"])
+                if send_new_frame <= send_prev_frame:
+                    await asyncio.sleep(0.05)
+                    continue
+                send_prev_frame = send_new_frame
+                streamsource.push_buf(send_obj, send_prev_frame)
+                print(TAG, str_cmd, send_prev_frame)
+                await asyncio.sleep(0.05)
+        except Exception as e:
+            print(TAG, "Err2", e)
+        finally:
+            # WebsocketProxy.streamManager.removeWebsocket(fr_path, websocket)
+            print(TAG, "Disconnected!")
 
+    async def recvHandler(websocket, fr_path, to_path):
+        recv_prev_frame = -1
+        TAG = "[{} <- {}] : ".format(fr_path, to_path)
+        streamsource = WebsocketProxy.streamManager.getStreamsource(to_path)
 
-                recv_obj = fr_streamsource.read_buf(recv_prev_frame)
+        try:
+            while True:
+                recv_obj = streamsource.read_buf(recv_prev_frame)
                 if recv_obj is None:
                     await asyncio.sleep(0.1)
                     continue
@@ -189,20 +185,41 @@ class WebsocketProxy:
                     await asyncio.sleep(0.1)
                     continue
 
-                # try:
-                #     recv_obj = {}
-                #     recv_obj["scene"] = data["scene"]
-                #     recv_obj["no"] = data["no"]
-                # except Exception as e:
-                #     print(RECV_TAG, "Err2", e)
                 await websocket.send(json.dumps(data))
-                print(RECV_TAG, str_cmd, recv_prev_frame)
+                print(TAG, str_cmd, recv_prev_frame)
                 await asyncio.sleep(0.05)
         except Exception as e:
             print(TAG, "Err2", e)
         finally:
             print(TAG, "Disconnected!")
-            WebsocketProxy.streamManager.removeWebsocket(fr_path, websocket)
+
+
+    async def inoutHandler(websocket, path):
+        print("[inoutHandler] New Websocket!", path)
+        vals = path.split('/')
+        try:
+            fr_path = int(vals[1])
+            to_path = int(vals[2])
+        except:
+            print("[inoutHandler] URL Error!", path)
+            return
+
+        TAG = "[{} => {}] : ".format(fr_path, to_path)
+
+
+
+        send_task = asyncio.ensure_future(
+            WebsocketProxy.sendHandler(websocket, fr_path, to_path))
+        recv_task = asyncio.ensure_future(
+            WebsocketProxy.recvHandler(websocket, fr_path, to_path))
+        done, pending = await asyncio.wait(
+            [send_task, recv_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+
+
 
 if __name__ == "__main__":
     import platform

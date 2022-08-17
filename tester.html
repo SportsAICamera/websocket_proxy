@@ -51,9 +51,9 @@
 
             if ("WebSocket" in window) {
                console.log("WebSocket is supported by your Browser!");
-               var domainPath = "66.29.133.111:8766";               
+               var domainPath = "66.29.133.111:8765";               
                // Let us open a web socket
-               ws = new WebSocket("ws://" + domainPath + "/1/1");
+               ws = new WebSocket("ws://" + domainPath + "/1/0");
                ws.onopen = function() {
                   
                   // Web Socket is connected, send data using send()
@@ -74,7 +74,10 @@
                      ctx.canvas.height = curHei;
                      ctx.drawImage(image_obj, 0, 0);
                   }
-                  image_obj.src = 'data:image/jpeg;base64,' + obj.scene;
+                  var cmd = obj.cmd;
+                  if(cmd != 0) {
+                     image_obj.src = 'data:image/jpeg;base64,' + obj.scene;
+                  }
                };
 				
                ws.onclose = function() { 
