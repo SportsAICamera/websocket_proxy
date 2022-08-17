@@ -10,19 +10,44 @@
       </style>
       <script type = "text/javascript">
          var ws;
+         const EnumCMD = {
+            NOTHING : -1,
+
+            SEND_IMAGE : 1000,
+
+            CMD_MOUSE_DOWN : 2001,
+            CMD_MOUSE_UP : 2002,
+            CMD_MOUSE_MOVE : 2003,
+            CMD_MOUSE_CLICK : 2004,
+            CMD_MOUSE_DBL_CLICK : 2005,
+         }
+
          function WebSocketTest() {
 
             var canvas = document.getElementById("canvas");
             var ctx = canvas.getContext("2d");
             var image_tag = document.getElementById("image");           
             var image_obj = new Image();
+            var send_frame_no = 0;
 
             canvas.addEventListener('mousedown', function(e) {
                 var pos = getCursorPosition(canvas, e)
+                var packet = {
+                  no: send_frame_no++,
+                  cmd: EnumCMD.CMD_MOUSE_DOWN,
+                  data: pos
+                };
+                send_ws_packet(packet);
                 console.log("[mouse down] x: " + pos[0] + " y: " + pos[1])
             })
             canvas.addEventListener('mouseup', function(e) {
                 var pos = getCursorPosition(canvas, e)
+                var packet = {
+                  no: send_frame_no++,
+                  cmd: EnumCMD.CMD_MOUSE_UP,
+                  data: pos
+                };
+                send_ws_packet(packet);
                 console.log("[mouse up] x: " + pos[0] + " y: " + pos[1])
             })
             canvas.addEventListener('mousemove', function(e) {
@@ -31,10 +56,22 @@
             })
             canvas.addEventListener('click', function(e) {
                 var pos = getCursorPosition(canvas, e)
+                var packet = {
+                  no: send_frame_no++,
+                  cmd: EnumCMD.CMD_MOUSE_CLICK,
+                  data: pos
+                };
+                send_ws_packet(packet);
                 console.log("[mouse click] x: " + pos[0] + " y: " + pos[1])
-            })
+               })
             canvas.addEventListener('dblclick', function(e) {
                 var pos = getCursorPosition(canvas, e)
+                var packet = {
+                  no: send_frame_no++,
+                  cmd: EnumCMD.CMD_MOUSE_DBL_CLICK,
+                  data: pos
+                };
+                send_ws_packet(packet);
                 console.log("[mouse dblclick] x: " + pos[0] + " y: " + pos[1])
             })
 
@@ -49,47 +86,59 @@
                return [x, y];
             }
 
-            if ("WebSocket" in window) {
-               console.log("WebSocket is supported by your Browser!");
-               var domainPath = "66.29.133.111:8765";               
-               // Let us open a web socket
-               ws = new WebSocket("ws://" + domainPath + "/1/0");
-               ws.onopen = function() {
-                  
-                  // Web Socket is connected, send data using send()
-                  // ws.send("Message to send");
-                  console.log("Connection is Opened...");
-               };
-				
-               ws.onmessage = function (evt) { 
-                  var received_msg = evt.data;
-                  var obj =  JSON.parse(received_msg);
-                  // alert("Message is received...");
-                  // image_tag.src = 'data:image/jpeg;base64,' + obj.scene;
-                  image_obj.onload = function() {
-                     var curWid = image_obj.width;
-                     var curHei = image_obj.height;
-                     console.log(curWid, curHei);
-                     ctx.canvas.width = curWid;
-                     ctx.canvas.height = curHei;
-                     ctx.drawImage(image_obj, 0, 0);
-                  }
-                  var cmd = obj.cmd;
-                  if(cmd != 0) {
-                     image_obj.src = 'data:image/jpeg;base64,' + obj.scene;
-                  }
-               };
-				
-               ws.onclose = function() { 
-                  
-                  // websocket is closed.
-                  console.log("Connection is closed..."); 
-               };
-            } else {
-              
-               // The browser doesn't support WebSocket
-               alert("WebSocket NOT supported by your Browser!");
+            function send_ws_packet(packet) {
+               if (ws.readyState === WebSocket.CLOSED) {
+                  connect_websocket();
+               } else { 
+                  ws.send(JSON.stringify(packet));
+               }
             }
+
+            function connect_websocket() {
+                  if ("WebSocket" in window) {
+                  console.log("WebSocket is supported by your Browser!");
+                  var domainPath = "66.29.133.111:8765";               
+                  // Let us open a web socket
+                  ws = new WebSocket("ws://" + domainPath + "/1/0");
+                  ws.onopen = function() {
+                     
+                     // Web Socket is connected, send data using send()
+                     // ws.send("Message to send");
+                     console.log("Connection is Opened...");
+                  };
+               
+                  ws.onmessage = function (evt) { 
+                     var received_msg = evt.data;
+                     var obj =  JSON.parse(received_msg);
+                     // alert("Message is received...");
+                     // image_tag.src = 'data:image/jpeg;base64,' + obj.scene;
+                     image_obj.onload = function() {
+                        var curWid = image_obj.width;
+                        var curHei = image_obj.height;
+                        console.log(curWid, curHei);
+                        ctx.canvas.width = curWid;
+                        ctx.canvas.height = curHei;
+                        ctx.drawImage(image_obj, 0, 0);
+                     }
+                     var cmd = obj.cmd;
+                     if(cmd == 1000) {
+                        image_obj.src = 'data:image/jpeg;base64,' + obj.data;
+                     }
+                  };
+               
+                  ws.onclose = function() { 
+                     
+                     // websocket is closed.
+                     console.log("Connection is closed..."); 
+                  };
+               } else {
+               
+                  // The browser doesn't support WebSocket
+                  alert("WebSocket NOT supported by your Browser!");
+               }
+            }
+            // Initially Connect to Websocket
+            connect_websocket();
          }
          function WebSocketClose() {
             ws.close()

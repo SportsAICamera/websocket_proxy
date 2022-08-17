@@ -27,7 +27,7 @@ class DataQueue:
 class StreamSource:
     def __init__(self, uid):
         self.st = self.ed = 0
-        self.sz = 3
+        self.sz = 5
         self.buf = [[] for x in range(self.sz)]
         self.frame_no = [[] for x in range(self.sz)]
         self.no = 0
